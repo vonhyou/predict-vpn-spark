@@ -10,5 +10,6 @@ object IoUtils {
 
   def printDataFrame(df: DataFrame): Unit =
     println(s"Number of schema: ${df.schema.length}")
+    println(s"Number of rows: ${df.count() - 1}")
     df.show(5)
 }
