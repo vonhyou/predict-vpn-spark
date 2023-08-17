@@ -1,22 +1,24 @@
-import org.apache.spark.ml.feature.{StringIndexer, VectorAssembler}
+import org.apache.spark.ml.feature.VectorAssembler
 import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.types.StringType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 object DataFrameUtils {
 
-  def getCleanedDataFrame(sc: SparkSession, path: String, isVpn: String): DataFrame =
+  def getCleanedDataFrame(sc: SparkSession, path: String, isVpn: Double): DataFrame =
     val rawDataFrame = IoUtils.readDataFrameFromCSV(path, sc)
     val filteredDataFrame = filterDataFrame(rawDataFrame)
     val cleanedDataFrame = filteredDataFrame.withColumn("isVPN", lit(isVpn))
     val featuredDataFrame = addFeaturesToDataFrame(cleanedDataFrame)
+    IoUtils.printDataFrame(featuredDataFrame)
     featuredDataFrame
 
   private def addFeaturesToDataFrame(df: DataFrame): DataFrame =
     val numericFeatures = df
       .schema
-      .filterNot(_.dataType.equals(StringType))
+      .filterNot(st => st.dataType.equals(StringType) || st.name.equals("isVPN"))
       .map(_.name)
+
     val assembler = new VectorAssembler()
       .setInputCols(numericFeatures.toArray)
       .setOutputCol("features")
@@ -38,10 +40,6 @@ object DataFrameUtils {
     val Array(trainingData2, testingData2) = df2.randomSplit(Array(df2Ratio, 1 - df2Ratio))
     val trainingData = trainingData1.union(trainingData2)
     val testingData = testingData1.union(testingData2)
+    (trainingData, testingData)
 
-    (addLabelToDataFrame(testingData), addLabelToDataFrame(testingData))
-
-  private def addLabelToDataFrame(df: DataFrame): DataFrame =
-    val indexer = new StringIndexer().setInputCol("isVPN").setOutputCol("label")
-    indexer.fit(df).transform(df)
 }
